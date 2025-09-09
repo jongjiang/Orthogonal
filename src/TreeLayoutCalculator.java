@@ -309,6 +309,52 @@ public class TreeLayoutCalculator {
 		return byDepth;
 	}
 
+	/** 建立以 u 為根之子樹輪廓 */
+	private static Contour buildContour(Node u, Map<Node, List<Node>> tree, Map<Node, Point> layout, Map<Node, Integer> depthMap) {
+		Contour c = new Contour();
+		Deque<Node> stack = new ArrayDeque<>();
+		stack.push(u);
+		while (!stack.isEmpty()) {
+			Node x = stack.pop();
+			int d = depthMap.getOrDefault(x, 0);
+			c.include(d, layout.get(x).x);
+			List<Node> children = tree.getOrDefault(x, List.of());
+			for (int i = children.size() - 1; i >= 0; --i) {
+				stack.push(children.get(i));
+			}
+		}
+		return c;
+	}
+
+	/**
+	 * 計算使 cu 與 acc 不重疊所需的位移量（負值 = 往左移）。 overlap = max_over_common_depth (acc.right + minGap - cu.left) 若 overlap <= 0 → 無需移動，回傳 0；否則回傳 -overlap。
+	 */
+	private static double overlapNeeded(Contour acc, Contour cu, double minGap) {
+		double need = Double.NEGATIVE_INFINITY;
+		Set<Integer> depths = new HashSet<>(acc.right.keySet());
+		depths.retainAll(cu.left.keySet());
+		if (depths.isEmpty())
+			return 0.0;
+		for (int d : depths) {
+			double r = acc.right.getOrDefault(d, Double.NEGATIVE_INFINITY);
+			double l = cu.left.getOrDefault(d, Double.POSITIVE_INFINITY);
+			need = Math.max(need, (r + minGap) - l);
+		}
+		if (need <= 0)
+			return 0.0; // 不需要移動
+		return -need; // 往左移
+	}
+
+	// （工具）計算目前佈局寬度（可用來比較不同策略的結果）
+	static double computeWidth(Map<Node, Point> layout) {
+		double min = Double.POSITIVE_INFINITY, max = Double.NEGATIVE_INFINITY;
+		for (Point p : layout.values()) {
+			min = Math.min(min, p.x);
+			max = Math.max(max, p.x);
+		}
+		return (layout.isEmpty() ? 0 : max - min);
+	}
+
 	// -------------------------
 	// 輪廓（contour）輔助結構與運算
 	// -------------------------
@@ -356,51 +402,5 @@ public class TreeLayoutCalculator {
 			}
 			return c;
 		}
-	}
-
-	/** 建立以 u 為根之子樹輪廓 */
-	private static Contour buildContour(Node u, Map<Node, List<Node>> tree, Map<Node, Point> layout, Map<Node, Integer> depthMap) {
-		Contour c = new Contour();
-		Deque<Node> stack = new ArrayDeque<>();
-		stack.push(u);
-		while (!stack.isEmpty()) {
-			Node x = stack.pop();
-			int d = depthMap.getOrDefault(x, 0);
-			c.include(d, layout.get(x).x);
-			List<Node> children = tree.getOrDefault(x, List.of());
-			for (int i = children.size() - 1; i >= 0; --i) {
-				stack.push(children.get(i));
-			}
-		}
-		return c;
-	}
-
-	/**
-	 * 計算使 cu 與 acc 不重疊所需的位移量（負值 = 往左移）。 overlap = max_over_common_depth (acc.right + minGap - cu.left) 若 overlap <= 0 → 無需移動，回傳 0；否則回傳 -overlap。
-	 */
-	private static double overlapNeeded(Contour acc, Contour cu, double minGap) {
-		double need = Double.NEGATIVE_INFINITY;
-		Set<Integer> depths = new HashSet<>(acc.right.keySet());
-		depths.retainAll(cu.left.keySet());
-		if (depths.isEmpty())
-			return 0.0;
-		for (int d : depths) {
-			double r = acc.right.getOrDefault(d, Double.NEGATIVE_INFINITY);
-			double l = cu.left.getOrDefault(d, Double.POSITIVE_INFINITY);
-			need = Math.max(need, (r + minGap) - l);
-		}
-		if (need <= 0)
-			return 0.0; // 不需要移動
-		return -need; // 往左移
-	}
-
-	// （工具）計算目前佈局寬度（可用來比較不同策略的結果）
-	static double computeWidth(Map<Node, Point> layout) {
-		double min = Double.POSITIVE_INFINITY, max = Double.NEGATIVE_INFINITY;
-		for (Point p : layout.values()) {
-			min = Math.min(min, p.x);
-			max = Math.max(max, p.x);
-		}
-		return (layout.isEmpty() ? 0 : max - min);
 	}
 }
